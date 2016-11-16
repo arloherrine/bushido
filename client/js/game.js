@@ -31,12 +31,20 @@ function preload() {
     game.load.image('swordsmith', 'assets/swordsmith.png');
 }
 
+var background_group;
+var midground_group;
+var foreground_group;
 var deck = [];
 var player_hand = [];
 var houses = [];
 var stats = [];
 var hand = [];
 var selected_card;
+var end_turn_bmd;
+var declare_war_bmd;
+var declare_shogun_bmd;
+var shogun_indicator;
+var active_buttons = [];
 /* TODO
 shogun flag per player
 shogun available thing
@@ -44,68 +52,94 @@ turn indicator
 move history/action indicator
 */
 
+function create_images() {
+    end_turn_bmd = game.add.bitmapData(80, 20);
+    end_turn_bmd.fill(0x00, 0x00, 0x00);
+    end_turn_bmd.rect(2, 2, 76, 16, "#3333ff");
+    end_turn_bmd.text("End Turn", 10, 14, "14px Times", "#dddddd", true);
+
+    declare_war_bmd = game.add.bitmapData(90, 20);
+    declare_war_bmd.fill(0x00, 0x00, 0x00);
+    declare_war_bmd.rect(2, 2, 86, 16, "#ff3333");
+    declare_war_bmd.text("Declare War", 10, 14, "14px Times", "#dddddd", true);
+
+    declare_shogun_bmd = game.add.bitmapData(110, 20);
+    declare_shogun_bmd.fill(0x00, 0x00, 0x00);
+    declare_shogun_bmd.rect(2, 2, 106, 16, "#33dd33");
+    declare_shogun_bmd.text("Declare Shogun", 10, 14, "14px Times", "#dddddd", true);
+}
+
 function create() {
-    var background = game.add.graphics();
+    background_group = game.add.group()
+    midground_group = game.add.group()
+    foreground_group = game.add.group()
+
+    create_images();
+
+    var background = game.add.graphics(0, 0, background_group);
     background.beginFill(0xcccccc);
     background.drawRect(0, 0, 1100, 600);
     background.endFill();
 
-    // TODO draw deck, etc.aClient = new HttpClient();
+    // TODO draw deck, etc.
+
     aClient = new HttpClient();
     aClient.get('/api/teststart', function(response) {
-        start_game(response);
+        game_state = response['state'];
+        moves = response['moves'];
+        start_game(game_state);
+        enableMoves(moves);
     });
+}
 
-    /*
-    start_game({
-        you : 0,
-        turn: 0,
-        shogun_available: true,
-        hand: [8, 43, 3, 16],
-        players: [
-            {
-                name: 'Jim',
-                total_honor: 0,
-                honor_per_turn: 20,
-                ki: 6,
-                strength: 5,
-                shogun: false,
-                daimyo: [4, 13, 2, 45], // Card ids
-                samurai: [0, 8], // Card ids
-            },
-            {
-                name: 'Bob',
-                total_honor: 0,
-                honor_per_turn: 30,
-                ki: 6,
-                strength: 2,
-                shogun: false,
-                daimyo: [23, 29, 25], // Card ids
-                samurai: [0, 24, 20], // Card ids
-            },
-            {
-                name: 'Kate',
-                total_honor: 0,
-                honor_per_turn: 15,
-                ki: 6,
-                strength: 6,
-                shogun: false,
-                daimyo: [6, 9, 14, 2], // Card ids
-                samurai: [0, 19, 31], // Card ids
-            },
-            {
-                name: 'Troy',
-                total_honor: 0,
-                honor_per_turn: 10,
-                ki: 6,
-                strength: 4,
-                shogun: false,
-                daimyo: [5, 17], // Card ids
-                samurai: [0, 15, 3], // Card ids
-            },
-        ],
-    });
-    */
+function enableMoves(moves) {
+    for (var i in moves) {
+        var move_tokens = moves[i].split(" ");
+        switch (move_tokens[0]) {
+            case "end_turn":
+                var button = game.make.button(500, 345, end_turn_bmd, function() {
+                    // TODO submit end turn action
+                    // TODO disable all turn inputs
+                });
+                //button.loadTexture(end_turn_bmd);
+                foreground_group.add(button);
+                active_buttons.push(button);
+                break;
+            case "declare_shogun":
+                var button = game.make.button(160, 345, null, function() {
+                    // TODO submit declare shogun action
+                    // TODO disable all turn inputs
+                });
+                button.loadTexture(declare_shogun_bmd);
+                foreground_group.add(button);
+                active_buttons.push(button);
+                break;
+            case "declare_war":
+                // TODO move button based on target player
+                var button = game.make.button(500, 400, null, function() {
+                    // TODO submit declare war action
+                    // TODO disable all turn inputs
+                });
+                button.loadTexture(declare_war_bmd);
+                foreground_group.add(button);
+                active_buttons.push(button);
+                break;
+            case "card_action":
+                var hand_index = parseInt(move_tokens[1].split("_")[1]);
+                const card_sprite = hand[hand_index];
+                const card_border = game.add.graphics(card_sprite.x - 2, card_sprite.y - 2, midground_group);
+                card_border.beginFill(0xff8800);
+                card_border.drawRect(0, 0, 74, 74);
+                card_border.endFill();
+                card_sprite.events.onInputDown.addOnce(function() {
+                    card_border.destroy();
+                    // TODO add handler to this to replace this
+                    // TODO add handlers to next targets
+                    // TODO disable all turn inputs
+                });
+                break;
+        }
+    }
 }
 
 function start_game(game_state) {
@@ -117,7 +151,7 @@ function start_game(game_state) {
         player_state = game_state.players[player_id];
 
         var base_x = 5 + (800 / 3) * (i - 1);
-        var background = game.add.graphics();
+        var background = game.add.graphics(0, 0, background_group);
         background.beginFill(0x000000);
         background.drawRect(base_x - 5, 0, 801 / 3, 180);
         background.endFill();
@@ -142,7 +176,7 @@ function start_game(game_state) {
             card_sprite.inputEnabled = true;
             card_sprite.events.onInputDown.add(function() {
                 if (selected_card) {
-                    selected_card.kill(); // destroy?
+                    selected_card.destroy();
                 }
                 selected_card = game.add.sprite(800, 200, create_card(card_data, true))
             });
@@ -168,7 +202,7 @@ function start_game(game_state) {
             card_sprite.inputEnabled = true;
             card_sprite.events.onInputDown.add(function() {
                 if (selected_card) {
-                    selected_card.kill(); // destroy?
+                    selected_card.destroy();
                 }
                 selected_card = game.add.sprite(800, 200, create_card(card_data, true))
             });
@@ -189,7 +223,7 @@ function start_game(game_state) {
 }
 
 function draw_this_player(game_state) {
-    var background = game.add.graphics();
+    var background = game.add.graphics(0, 0, background_group);
     background.beginFill(0x000000);
     background.drawRect(0, 340, 800, 260);
     background.endFill();
@@ -226,7 +260,7 @@ function draw_this_player(game_state) {
         card_sprite.inputEnabled = true;
         card_sprite.events.onInputDown.add(function() {
             if (selected_card) {
-                selected_card.kill(); // destroy?
+                selected_card.destroy();
             }
             selected_card = game.add.sprite(800, 200, create_card(card_data, true))
         });
@@ -241,7 +275,7 @@ function draw_this_player(game_state) {
         card_sprite.inputEnabled = true;
         card_sprite.events.onInputDown.add(function() {
             if (selected_card) {
-                selected_card.kill(); // destroy?
+                selected_card.destroy();
             }
             selected_card = game.add.sprite(800, 200, create_card(card_data, true))
         });
@@ -258,7 +292,7 @@ function draw_this_player(game_state) {
         card_sprite.inputEnabled = true;
         card_sprite.events.onInputDown.add(function() {
             if (selected_card) {
-                selected_card.kill(); // destroy?
+                selected_card.destroy();
             }
             selected_card = game.add.sprite(800, 200, create_card(card_data, true))
         });

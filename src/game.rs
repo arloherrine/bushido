@@ -1,4 +1,4 @@
-use cards::{Card};
+use cards::{Card, ActionResult, ActionTarget, CardDest, CardSource};
 use player::{Player};
 use house::{House, HouseType};
 
@@ -6,7 +6,8 @@ use rand::{thread_rng, Rng};
 use std::fmt::Write;
 
 pub struct Game {
-    turn: u8,
+    turn: usize,
+    actions_used: u8,
     shogun_available: bool,
     players: Vec<Player>,
     deck: Vec<Card>,
@@ -62,12 +63,59 @@ impl Game {
         }
         //let players = player_names.iter().zip(player_daimyos.iter()).map(|(name, &daimyo_card)| Player::new(name, daimyo_card, deck.drain(0..7).collect())).collect();
         Game {
-            turn: 0,
+            turn: 0, // TODO randomize who goes first
+            actions_used: 0,
             shogun_available: true,
             players: players,
             deck: deck,
             discard: Vec::new(),
         }
+    }
+
+    pub fn getMoves(&self) -> String {
+        let player = &self.players[self.turn];
+        let card_actions = (player.ki() / 3) as u8 - self.actions_used;
+        let mut result = String::new();
+        write!(&mut result, "[\n");
+        for (i, card) in player.hand.iter().enumerate() {
+            if let Some(actions) = card.cardActions() {
+                if actions <= card_actions {
+                    card.getActionTargets(self.turn, &self.players).iter().map(|actionTarget| {
+                        write!(&mut result, "    \"card_action hand_{} ", i);
+                        match *actionTarget {
+                            ActionTarget::Target(ref dest) => writeCardDestToString(&mut result, &dest),
+                            ActionTarget::Steal(ref source, ref dest) => {
+                                write!(&mut result, "steal_{}_{}_{} ", source.player_id, source.house, source.index);
+                                writeCardDestToString(&mut result, &dest);
+                            },
+                            ActionTarget::DoubleSteal(ref source1, ref dest1, ref source2, ref dest2) => {
+                                write!(&mut result, "steal_{}_{}_{} ", source1.player_id, source1.house, source1.index);
+                                writeCardDestToString(&mut result, &dest1);
+                                write!(&mut result, " steal_{}_{}_{} ", source2.player_id, source2.house, source2.index);
+                                writeCardDestToString(&mut result, &dest2);
+                            }
+                        }
+                        write!(&mut result, "\",\n");
+                    }).count();
+                }
+            }
+        }
+
+        self.players.iter().enumerate()
+                .filter(|&(player_id, player)| player_id != self.turn && (player.isShogun || player.daimyo.contents.iter().any(|card| card.id() == 12 || card.id() == 13 || card.id() == 14)))
+                .map(|(player_id, _)| write!(&mut result, "    \"declare_war {}\",\n", player_id));
+
+        if self.shogun_available {
+            write!(&mut result, "    \"declare_shogun\",\n");
+        }
+
+        write!(&mut result, "    \"end_turn\"\n]");
+        result
+    }
+
+    pub fn executeMove(&mut self, input: &str) -> Vec<ActionResult> {
+        // TODO parse input
+        Vec::new()
     }
 
     pub fn serialize(&self, player_id: usize) -> String {
@@ -88,9 +136,17 @@ impl Game {
             writePlayerToString(&mut result, player);
         }).count();
         write!(&mut result, "\n    ]\n").unwrap();
-        write!(&mut result, "}}\n").unwrap();
+        write!(&mut result, "}}").unwrap();
         result
     }
+}
+
+fn writeCardDestToString(mut result: &mut String, dest: &CardDest) {
+    match *dest {
+        CardDest::Player(player_id) => write!(&mut result, "player_{}", player_id),
+        CardDest::House(player_id, ref house_type) => write!(&mut result, "house_{}_{}", player_id, house_type),
+        CardDest::Discard => write!(&mut result, "discard"),
+    };
 }
 
 fn writePlayerToString(mut result: &mut String, player: &Player) {

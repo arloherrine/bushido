@@ -43,6 +43,9 @@ fn test_start(r: &mut Request, gameStore: &mut MemoryStore) -> IronResult<Respon
         None => Game::new(&["Greg", "Bob", "Sally", "Jeff"])
     };
     let serialized = game.serialize(0);
+    let moves = game.getMoves();
 
-    Ok(Response::with((status::Ok, serialized)))
+    let resp = format!("{{\"state\":\n{},\n\n\"moves\":\n{}\n}}", serialized, moves);
+
+    Ok(Response::with((status::Ok, resp)))
 }

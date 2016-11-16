@@ -1,4 +1,5 @@
 use cards;
+use std::fmt;
 
 pub struct House {
     pub contents: Vec<cards::Card>,
@@ -7,6 +8,15 @@ pub struct House {
 pub enum HouseType {
     Daimyo,
     Samurai,
+}
+
+impl fmt::Display for HouseType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match *self {
+            HouseType::Daimyo => "daimyo",
+            HouseType::Samurai => "samurai",
+        })
+    }
 }
 
 impl House {

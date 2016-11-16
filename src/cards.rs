@@ -41,9 +41,9 @@ pub enum ActionTarget {
 }
 
 pub struct CardSource {
-    player_id: usize,
-    house: house::HouseType,
-    index: usize,
+    pub player_id: usize,
+    pub house: house::HouseType,
+    pub index: usize,
 }
 
 pub enum CardDest {

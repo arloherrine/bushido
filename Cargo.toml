@@ -1,5 +1,5 @@
 [package]
-name = "bushido-server"
+name = "bushido"
 version = "0.1.0"
 authors = ["arlo <arlo@indeed.com>"]
 
