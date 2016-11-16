@@ -1,0 +1,11 @@
+[package]
+name = "bushido-server"
+version = "0.1.0"
+authors = ["arlo <arlo@indeed.com>"]
+
+[dependencies]
+iron = "*"
+staticfile = "*"
+mount = "*"
+rand = "*"
+
