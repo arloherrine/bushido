@@ -81,7 +81,7 @@ impl Game {
             if let Some(actions) = card.cardActions() {
                 if actions <= card_actions {
                     card.getActionTargets(self.turn, &self.players).iter().map(|actionTarget| {
-                        write!(&mut result, "    \"card_action hand_{} ", i);
+                        write!(&mut result, "    \"hand_{} ", i);
                         match *actionTarget {
                             ActionTarget::Target(ref dest) => writeCardDestToString(&mut result, &dest),
                             ActionTarget::Steal(ref source, ref dest) => {
@@ -99,6 +99,10 @@ impl Game {
                     }).count();
                 }
             }
+        }
+
+        if player.hand.len() < 7 {
+            write!(&mut result, "    \"draw\"\n]");
         }
 
         self.players.iter().enumerate()

@@ -34,17 +34,19 @@ function preload() {
 var background_group;
 var midground_group;
 var foreground_group;
-var deck = [];
-var player_hand = [];
+var deck;
+var discard;
+var this_player_id;
 var houses = [];
 var stats = [];
 var hand = [];
 var selected_card;
-var end_turn_bmd;
-var declare_war_bmd;
-var declare_shogun_bmd;
+var end_turn_button;
+var declare_war_button;
+var declare_shogun_button;
 var shogun_indicator;
-var active_buttons = [];
+var moves = [];
+var move_prefix = '';
 /* TODO
 shogun flag per player
 shogun available thing
@@ -52,29 +54,215 @@ turn indicator
 move history/action indicator
 */
 
-function create_images() {
-    end_turn_bmd = game.add.bitmapData(80, 20);
+function create_input_handlers() {
+    var border = game.make.graphics(0, 0);
+
+    border.beginFill(0x0, 0);
+    border.drawRect(0, 0, 70, 70);
+    border.endFill();
+
+    border.beginFill(0x00ff00);
+    border.drawRect(71, 0, 70, 3);
+    border.drawRect(138, 0, 3, 70);
+    border.drawRect(71, 67, 70, 3);
+    border.drawRect(71, 0, 3, 70);
+    border.endFill();
+
+    border.beginFill(0xffff00);
+    border.drawRect(142, 0, 70, 3);
+    border.drawRect(209, 0, 3, 70);
+    border.drawRect(142, 67, 70, 3);
+    border.drawRect(142, 0, 3, 70);
+    border.endFill();
+
+    game.cache.addSpriteSheet('border', null, border.generateTexture().baseTexture.source, 70, 70, 3, 0, 1);
+
+    var end_turn_bmd = game.add.bitmapData(80, 20);
     end_turn_bmd.fill(0x00, 0x00, 0x00);
     end_turn_bmd.rect(2, 2, 76, 16, "#3333ff");
     end_turn_bmd.text("End Turn", 10, 14, "14px Times", "#dddddd", true);
+    end_turn_button = game.make.button(500, 345, end_turn_bmd, function() {
+        // TODO submit end turn action
+        // TODO disable all turn inputs
+    });
 
-    declare_war_bmd = game.add.bitmapData(90, 20);
+    var declare_war_bmd = game.add.bitmapData(90, 20);
     declare_war_bmd.fill(0x00, 0x00, 0x00);
     declare_war_bmd.rect(2, 2, 86, 16, "#ff3333");
     declare_war_bmd.text("Declare War", 10, 14, "14px Times", "#dddddd", true);
+    // TODO make buttons for each enemy player
+    declare_war_button = game.make.button(160, 345, null, function() {
+        // TODO submit declare shogun action
+        // TODO disable all turn inputs
+    });
 
-    declare_shogun_bmd = game.add.bitmapData(110, 20);
+    var declare_shogun_bmd = game.add.bitmapData(110, 20);
     declare_shogun_bmd.fill(0x00, 0x00, 0x00);
     declare_shogun_bmd.rect(2, 2, 106, 16, "#33dd33");
     declare_shogun_bmd.text("Declare Shogun", 10, 14, "14px Times", "#dddddd", true);
+    declare_shogun_button= game.make.button(500, 400, null, function() {
+        // TODO submit declare war action
+        // TODO disable all turn inputs
+    });
+
+    // TODO create deck sprite with handler
+    deck = game.add.sprite(170, 700, 'logo');
+    deck.width = 70;
+    deck.height = 70;
+
+
+    // TODO create discard sprite with handler
+
+    // TODO player input handlers
+    // TODO house input handlers
+    // house card handlers
+    for (var player_id in houses) {
+        for (var house in houses[player_id]) {
+            for (var card_index in houses[player_id][house]) {
+                const this_strs = [
+                    "steal_" + player_id + "_" + house + "_" + card_index,
+                    "house_" + player_id + "_" + house,
+                    "player_" + player_id
+                    ];
+                houses[player_id][house][card_index].addChild(game.make.image(0, 0, 'border'));
+                houses[player_id][house][card_index].events.onInputDown.add(function () {
+                    var tuple = get_move_status(this_strs);
+                    var this_str = tuple[0];
+                    var status = tuple[1];
+                    switch (status) {
+                        case 'complete':
+                            // TODO submit move
+                            break;
+                        case 'continue':
+                            move_prefix = (move_prefix + " " + this_str).trim();
+                            draw_active_inputs();
+                            break;
+                        case 'ending':
+                            move_prefix = move_prefix.substring(0, move_prefix.length - this_str.length).trim();
+                            draw_active_inputs();
+                            break;
+                    }
+                });
+            }
+        }
+    }
+    // hand card handlers
+    for (var hand_index in hand) {
+        const this_strs = [
+            "hand_" + hand_index,
+            "player_" + this_player_id,
+            ];
+        hand[hand_index].addChild(game.make.image(0, 0, 'border'));
+        hand[hand_index].events.onInputDown.add(function () {
+            var tuple = get_move_status(this_strs);
+            var this_str = tuple[0];
+            var status = tuple[1];
+            switch (status) {
+                case 'complete':
+                    // TODO submit move
+                    break;
+                case 'continue':
+                    move_prefix = (move_prefix + " " + this_str).trim();
+                    draw_active_inputs();
+                    break;
+                case 'ending':
+                    move_prefix = move_prefix.substring(0, move_prefix.length - this_str.length).trim();
+                    draw_active_inputs();
+                    break;
+            }
+        });
+    }
+}
+
+function get_move_status(this_strs) {
+    for (var j in this_strs) {
+        var this_str = this_strs[j];
+        if (move_prefix.endsWith(this_str)) {
+            return [this_str, 'ending']
+        } else if (move_prefix.includes(this_str)) {
+            return [this_str, 'prefix'];
+        }
+    }
+    for (var i in moves) {
+        var move = moves[i];
+        if (move.startsWith(move_prefix)) {
+            for (var j in this_strs) {
+                var this_str = this_strs[j];
+                var move_suffix = move.substring(move_prefix.length).trim();
+                if (move_suffix == this_str) {
+                    return [this_str, 'complete'];
+                } else if (move_suffix.startsWith(this_str)) {
+                    return [this_str, 'continue'];
+                }
+            }
+        }
+    }
+    return ['', 'none'];
+}
+
+function draw_active_inputs() {
+    // TODO buttons
+    // TODO full player highlights
+    // TODO player house highlights
+
+    // TODO house card highlights
+    for (var player_id in houses) {
+        for (var house in houses[player_id]) {
+            for (var card_index in houses[player_id][house]) {
+                const this_strs = [
+                    "steal_" + player_id + "_" + house + "_" + card_index,
+                    "house_" + player_id + "_" + house,
+                    "player_" + player_id
+                    ];
+                var tuple = get_move_status(this_strs);
+                var this_str = tuple[0];
+                var status = tuple[1];
+                switch (status) {
+                    case 'complete':
+                    case 'continue':
+                        houses[player_id][house][card_index].children[0].frame = 1;
+                        break;
+                    case 'ending':
+                    case 'prefix':
+                        houses[player_id][house][card_index].children[0].frame = 2;
+                        break;
+                    default:
+                        houses[player_id][house][card_index].children[0].frame = 0;
+                        break;
+                }
+            }
+        }
+    }
+
+    // TODO hand card highlights
+    for (var hand_index in hand) {
+        const this_strs = [
+            "hand_" + hand_index,
+            "player_" + this_player_id,
+            ];
+        var tuple = get_move_status(this_strs);
+        var this_str = tuple[0];
+        var status = tuple[1];
+        switch (status) {
+            case 'complete':
+            case 'continue':
+                hand[hand_index].children[0].frame = 1;
+                break;
+            case 'ending':
+            case 'prefix':
+                hand[hand_index].children[0].frame = 2;
+                break;
+            default:
+                hand[hand_index].children[0].frame = 0;
+                break;
+        }
+    }
 }
 
 function create() {
     background_group = game.add.group()
     midground_group = game.add.group()
     foreground_group = game.add.group()
-
-    create_images();
 
     var background = game.add.graphics(0, 0, background_group);
     background.beginFill(0xcccccc);
@@ -88,62 +276,14 @@ function create() {
         game_state = response['state'];
         moves = response['moves'];
         start_game(game_state);
-        enableMoves(moves);
+        create_input_handlers();
+        draw_active_inputs();
     });
 }
 
-function enableMoves(moves) {
-    for (var i in moves) {
-        var move_tokens = moves[i].split(" ");
-        switch (move_tokens[0]) {
-            case "end_turn":
-                var button = game.make.button(500, 345, end_turn_bmd, function() {
-                    // TODO submit end turn action
-                    // TODO disable all turn inputs
-                });
-                //button.loadTexture(end_turn_bmd);
-                foreground_group.add(button);
-                active_buttons.push(button);
-                break;
-            case "declare_shogun":
-                var button = game.make.button(160, 345, null, function() {
-                    // TODO submit declare shogun action
-                    // TODO disable all turn inputs
-                });
-                button.loadTexture(declare_shogun_bmd);
-                foreground_group.add(button);
-                active_buttons.push(button);
-                break;
-            case "declare_war":
-                // TODO move button based on target player
-                var button = game.make.button(500, 400, null, function() {
-                    // TODO submit declare war action
-                    // TODO disable all turn inputs
-                });
-                button.loadTexture(declare_war_bmd);
-                foreground_group.add(button);
-                active_buttons.push(button);
-                break;
-            case "card_action":
-                var hand_index = parseInt(move_tokens[1].split("_")[1]);
-                const card_sprite = hand[hand_index];
-                const card_border = game.add.graphics(card_sprite.x - 2, card_sprite.y - 2, midground_group);
-                card_border.beginFill(0xff8800);
-                card_border.drawRect(0, 0, 74, 74);
-                card_border.endFill();
-                card_sprite.events.onInputDown.addOnce(function() {
-                    card_border.destroy();
-                    // TODO add handler to this to replace this
-                    // TODO add handlers to next targets
-                    // TODO disable all turn inputs
-                });
-                break;
-        }
-    }
-}
-
 function start_game(game_state) {
-    
+
+    this_player_id = game_state.you;
     draw_this_player(game_state);
 
     for (var i = 1; i < 4; i++) { // TODO actual number of players
@@ -283,7 +423,8 @@ function draw_this_player(game_state) {
     }
     houses[game_state.you] = {daimyo: daimyo, samurai: samurai};
 
-    
+
+    hand = [];
     padding = (800 - game_state.hand.length * 75) / 2;
     for (var j in game_state.hand) {
         const card_data = game_state.hand[j];
@@ -339,11 +480,11 @@ function absolute_position(player_index, x, y) {
 
 function create_card(card_index, large) {
     if (large) {
-        var base = game.add.bitmapData(300, 400);
+        var base = game.make.bitmapData(300, 400);
         base.fill(0x00, 0x00, 0x00);
         base.rect(2, 2, 296, 396, "#ffffff");
     } else {
-        var base = game.add.bitmapData(70, 70);
+        var base = game.make.bitmapData(70, 70);
         base.fill(0x00, 0x00, 0x00);
         base.rect(1, 1, 68, 68, "#ffffff");
     }
